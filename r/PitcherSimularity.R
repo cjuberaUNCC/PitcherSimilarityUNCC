@@ -15,38 +15,32 @@ trackman_grouped <- trackman %>%
     RelHeight = mean(RelHeight),
     RelSide = mean(RelSide),
     Extension = mean(Extension),
-    RelSpeed = mean(RelSpeed)
+    RelSpeed = mean(RelSpeed),
+    NumPitches = n()
   ) %>%
   drop_na()
 # Normalize numeric values
 min_max_norm <- function(x){(x-min(x))/(max(x)-min(x))}
 
-trackman_grouped_normalized <- trackman_grouped
-trackman_grouped_normalized[, 6:11] <- lapply(trackman_grouped_normalized[, 6:11], min_max_norm)
-
+trackman_grouped[, 6:11] <- lapply(trackman_grouped[, 6:11], min_max_norm)
 # Compare pitchers using euclidean distance
 euclidean <- function(a, b) sqrt(sum((a - b)^2))
 
 # fix
 get_sim <- function(PlayerName, PitchType) {
   list_sim_scores = c()
-  list_pitcher_names = c()
-  trackman_grouped_filtered <- trackman_grouped_normalized %>% filter(TaggedPitchType == PitchType)
+  trackman_grouped_filtered <- trackman_grouped %>% filter(TaggedPitchType == PitchType)
   player_index <- which((trackman_grouped_filtered$Pitcher == PlayerName))
-  player_row <- trackman_grouped_filtered[player_index, ]
-  players_to_compare_to <- trackman_grouped_filtered[-player_index,]
   # For right now compare to all, later compare to only charlotte players
-  for(compared_player_index in 1:length(players_to_compare_to)){
-    list_pitcher_names <- append(list_pitcher_names, players_to_compare_to[compared_player_index, 'Pitcher'])
-    list_sim_scores <- append(list_sim_scores, euclidean(player_row[,6:11], players_to_compare_to[compared_player_index, 6:11]))
+  for(compared_player_index in 1:nrow(trackman_grouped_filtered)){
+    list_sim_scores <- append(list_sim_scores, euclidean(trackman_grouped_filtered[player_index,6:11], trackman_grouped_filtered[compared_player_index, 6:11]))
   }
-  matrix_test = tibble(names = list_pitcher_names, scores = list_sim_scores)
-  
-  return(matrix_test)
-  
+  trackman_grouped_filtered$SimScore <- list_sim_scores
+  return(trackman_grouped_filtered)
 }
 
-matrix_test = tibble(names = list_pitcher_names, scores = list_sim_scores)
+view(get_sim("Schafer, Luke", "Fastball"))
+
 # Compare pitchers using KNN
 
   
