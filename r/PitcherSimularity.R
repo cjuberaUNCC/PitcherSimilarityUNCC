@@ -43,5 +43,20 @@ view(get_sim("Schafer, Luke", "Fastball"))
 
 # Compare pitchers using KNN
 
-  
-  
+# Compare arsenal
+
+# make table for all pitches in arsenal and compare based on avg simscore or euclidean between the players
+pitch_columns <- c("Fastball","Slider","Curveball","ChangeUp","Cutter","Knuckleball","Splitter","Sinker")
+
+arsenal <- tibble()
+arsenal["PitcherName"] <- NA
+arsenal[pitch_columns] <- NA
+for(pitch in pitch_columns){
+  temp_pitch_tbl <- get_sim("Schafer, Luke", pitch)
+  for(index in 1:nrow(temp_pitch_tbl)){
+    arsenal[index, "PitcherName"] <- temp_pitch_tbl[index,]$Pitcher
+    arsenal[index, pitch] <- temp_pitch_tbl[index,]$SimScore
+  }
+    
+}
+get_sim("Schafer, Luke", "Slider")
