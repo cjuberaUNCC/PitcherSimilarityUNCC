@@ -28,18 +28,27 @@ euclidean <- function(a, b) sqrt(sum((a - b)^2))
 
 # fix
 get_sim <- function(PlayerName, PitchType) {
-  list_sim_scores = c()
+  Pitchers <- unique(trackman_grouped$Pitcher)
+  compare_pitchers_pitch = tibble(Pitcher = Pitchers, Similarity = NA)
   trackman_grouped_filtered <- trackman_grouped %>% filter(TaggedPitchType == PitchType)
+  if(!(PlayerName %in% trackman_grouped_filtered$Pitcher)){
+    compare_pitchers_pitch[, "Similarity"] <- NA
+    return(compare_pitchers_pitch)
+  }
   player_index <- which((trackman_grouped_filtered$Pitcher == PlayerName))
   # For right now compare to all, later compare to only charlotte players
-  for(compared_player_index in 1:nrow(trackman_grouped_filtered)){
-    list_sim_scores <- append(list_sim_scores, euclidean(trackman_grouped_filtered[player_index,6:11], trackman_grouped_filtered[compared_player_index, 6:11]))
+  for(pitcher_index in 1:length(Pitchers)){
+    if(Pitchers[pitcher_index] %in% unique(trackman_grouped_filtered$Pitcher)){
+      temp_pitcher_index <- which((trackman_grouped_filtered$Pitcher == Pitchers[pitcher_index]))
+      temp <- euclidean(trackman_grouped_filtered[player_index,6:11], trackman_grouped_filtered[temp_pitcher_index, 6:11])
+    } else{
+      temp <- 4
+    }
+    compare_pitchers_pitch[pitcher_index, "Similarity"] <- temp
   }
-  trackman_grouped_filtered$SimScore <- list_sim_scores
-  return(trackman_grouped_filtered)
+  return(compare_pitchers_pitch)
 }
-
-view(get_sim("Schafer, Luke", "Fastball"))
+get_sim("Schafer, Luke", "Slider") %>% view()
 
 # Compare pitchers using KNN
 
@@ -47,16 +56,10 @@ view(get_sim("Schafer, Luke", "Fastball"))
 
 # make table for all pitches in arsenal and compare based on avg simscore or euclidean between the players
 pitch_columns <- c("Fastball","Slider","Curveball","ChangeUp","Cutter","Knuckleball","Splitter","Sinker")
-
-arsenal <- tibble()
-arsenal["PitcherName"] <- NA
+arsenal <- tibble(Pitcher = unique(trackman_grouped$Pitcher))
 arsenal[pitch_columns] <- NA
-for(pitch in pitch_columns){
-  temp_pitch_tbl <- get_sim("Schafer, Luke", pitch)
-  for(index in 1:nrow(temp_pitch_tbl)){
-    arsenal[index, "PitcherName"] <- temp_pitch_tbl[index,]$Pitcher
-    arsenal[index, pitch] <- temp_pitch_tbl[index,]$SimScore
-  }
-    
+for(pitch_index in 1:length(pitch_columns)){
+  temp_pitch_tbl <- get_sim("Schafer, Luke", pitch_columns[pitch_index])
+  arsenal[,pitch_columns[pitch_index]] <- temp_pitch_tbl$Similarity
 }
-get_sim("Schafer, Luke", "Slider")
+get_sim("Schafer, Luke", "ChangeUp")
