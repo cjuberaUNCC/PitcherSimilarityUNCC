@@ -1,6 +1,6 @@
 library(shiny)
 library(tidyverse)
-
+options(shiny.maxRequestSize=30*1024^2)
 ui <- fluidPage(
   titlePanel("Pitcher Similarity Analysis"),
   sidebarLayout(
@@ -11,7 +11,12 @@ ui <- fluidPage(
                          ".csv")),
       selectInput("type", "Select Analysis Type",
                   choices = c("Pitch", "Arsenal")),
-      textInput("name", "Enter Pitcher Name"),
+      conditionalPanel(
+        condition = "input.type == 'Pitch'",
+        selectInput("pitch_type", "Select Pitch Type",
+                    choices = c("Fastball","Slider","Curveball","ChangeUp","Cutter","Knuckleball","Splitter","Sinker"))
+      ),
+      textInput("name", "Pitcher Name:"),
       actionButton("submit", "Submit")
     ),
     mainPanel(
@@ -21,14 +26,12 @@ ui <- fluidPage(
 )
 
 server <- function(input, output) {
-  
-  # Load data from user input
   data <- reactive({
     req(input$file)
-    read_csv(input$file$datapath)
-  })
-  trackman_grouped <- reactive({
-    data() %>%
+    trackman <- read_csv(input$file)
+  
+    ## Group file by pticher type
+    trackman_grouped <- trackman %>%
       group_by(PitcherId, TaggedPitchType, Pitcher, PitcherTeam, PitcherThrows) %>% 
       mutate(PitcherName = Pitcher) %>% 
       summarise(
@@ -41,11 +44,12 @@ server <- function(input, output) {
         NumPitches = n()
       ) %>%
       drop_na()
+    # Define a function to calculate the minmax norm
+    min_max_norm <- function(x){(x-min(x))/(max(x)-min(x))}
+    # Normalize the numeric columns with the min max norm fucntion
+    trackman_grouped[, 6:11] <- lapply(trackman_grouped[, 6:11], min_max_norm)
   })
-  # Define a function to calculate the minmax norm
-  min_max_norm <- function(x){(x-min(x))/(max(x)-min(x))}
-  # Normalize the numeric columns with the min max norm fucntion
-  trackman_grouped[, 6:11] <- lapply(trackman_grouped[, 6:11], min_max_norm)
+  
   
   # Define function to calculate the euclidean distance between two values
   euclidean <- function(a, b) sqrt(sum((a - b)^2))
@@ -54,13 +58,12 @@ server <- function(input, output) {
     similarity <- 4 / (1 + euclidean(a, b))
     return(round(similarity, 3))
   }
-  
-  # Define function to calculate similarity between pitchers for a given pitch type
+  # Create simularity function for pitches
   get_sim <- function(PlayerName, PitchType) {
     
-    Pitchers <- unique(trackman_grouped$Pitcher) # Get a vector of the pitcher names, If you only want to compare certain types of players filter here(ie. PitcherTeam == "CHA_FOR")
+    Pitchers <- unique(data()$Pitcher) # Get a vector of the pitcher names, If you only want to compare certain types of players filter here(ie. PitcherTeam == "CHA_FOR")
     compare_pitchers_pitch = tibble(Pitcher = Pitchers, Similarity = NA) # Create a table with the pitchers vector and a column for Similarity
-    trackman_grouped_filtered <- trackman_grouped %>% filter(TaggedPitchType == PitchType) # Filter table by PitchType passed in function
+    trackman_grouped_filtered <- data() %>% filter(TaggedPitchType == PitchType) # Filter table by PitchType passed in function
     # If the player passed does not have the pitch passed make the similarity score of those who do have the pitch equal to 2 and those who also dont equal to 0
     if(!(PlayerName %in% trackman_grouped_filtered$Pitcher)){
       for(pitcher_index in 1:length(Pitchers)){
@@ -73,7 +76,6 @@ server <- function(input, output) {
       }
       return(compare_pitchers_pitch)
     }
-    
     player_index <- which((trackman_grouped_filtered$Pitcher == PlayerName)) # Get the index of the player passed to compare later
     # Iterate through each pitcher in pitchers list
     for(pitcher_index in 1:length(Pitchers)){
@@ -88,13 +90,10 @@ server <- function(input, output) {
     }
     return(compare_pitchers_pitch)
   }
-  
-  
-  
   # make table for all pitches in arsenal and compare based on avg simscore or euclidean between the players
   arsenal_func <- function(PitcherName) {
     pitch_columns <- c("Fastball","Slider","Curveball","ChangeUp","Cutter","Knuckleball","Splitter","Sinker")
-    arsenal <- tibble(Pitcher = unique(trackman_grouped$Pitcher))
+    arsenal <- tibble(Pitcher = unique(data()$Pitcher))
     arsenal[pitch_columns] <- NA
     for(pitch_index in 1:length(pitch_columns)){
       temp_pitch_tbl <- get_sim(PitcherName, pitch_columns[pitch_index])
@@ -102,17 +101,19 @@ server <- function(input, output) {
     }
     arsenal <- arsenal %>% mutate(mean = round(rowSums(arsenal[, 2:9])/8, 2))
     return(arsenal)
-  }
-
-  
-  # Generate table based on user inputs
-  output$table <- renderTable({
-    if (input$type == "pitch") {
-      get_sim(data(), input$name)
-    } else {
-      arsenal_func(data(), input$name)
-    }
     
-  })
+  }
+  
+  if(input$type == "Pitch"){
+    output$similarity_table <- renderTable({
+      get_sim(input$name, input$pitch_type)
+    })
+  } else if(input$type == "Arsenal"){
+    output$similarity_table <- renderTable({
+      output$similarity_table <- arsenal_func(input$name)
+    })
+  }
   
 }
+
+shinyApp(ui, server)
