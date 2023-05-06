@@ -1,0 +1,14 @@
+name: PitcherSimilarity
+title: PitcherSimilarity
+username:
+account: charlie-jubera
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 8783468
+bundleId: 7179234
+url: https://charlie-jubera.shinyapps.io/PitcherSimilarity/
+when: 1683302471.40158
+lastSyncTime: 1683302471.40158
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .RData|CLT_TrackmanGames_2022.csv|PitcherSimularity.R|test.R|TrackmanGames_2022_Ball_CLT.csv
